@@ -1,4 +1,4 @@
-name: Build & Smuggle Saroth WeChat (BYOA 自动索敌版)
+name: Build & Smuggle Saroth WeChat (私有军火库版)
 on: 
   workflow_dispatch:
 
@@ -8,41 +8,34 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 1. 拉取你的私有仓库文件
-        uses: actions/checkout@v4
-        
-      - name: 2. 克隆作者图纸 & 全自动巡航索敌
+      - name: 1. 克隆作者图纸
         run: |
           echo "下载 Saroth 图纸..."
           git clone https://github.com/Saroth/docker_wechat.git workspace
           
-          echo "======================================"
-          echo "启动雷达，在你的仓库里搜索弹药..."
+      - name: 2. 从你自己的私有军火库提货
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "启动提货专线，直连你刚建的 ammo 仓库..."
           mkdir -p workspace/package
           
-          # 自动寻找任何一层目录下的 zip 和 exe
-          ZIP_FILE=$(find . -path ./workspace -prune -o -name "*.zip" -print | head -n 1)
-          EXE_FILE=$(find . -path ./workspace -prune -o -name "*.exe" -print | head -n 1)
+          # 直接从你自己的 release (标签为 ammo) 下载那两个文件
+          gh release download ammo -D workspace/package/
           
-          if [ -n "$ZIP_FILE" ]; then
-            echo "🎯 找到注入包: $ZIP_FILE"
-            # 不管你之前改没改名，这里强制给你改成标准名字！
-            mv "$ZIP_FILE" workspace/package/v_latest.zip
-          else
-            echo "❌ 致命错误：整个仓库都没找到 .zip 文件！你确定点 Upload 上传并 Commit 了吗？"
-            exit 1
-          fi
+          echo "提货完成！开始自动适配伪装..."
+          cd workspace/package/
           
-          if [ -n "$EXE_FILE" ]; then
-            echo "🎯 找到微信安装包: $EXE_FILE"
-            mv "$EXE_FILE" workspace/package/
-          else
-            echo "❌ 致命错误：整个仓库都没找到 .exe 文件！"
-            exit 1
+          # 自动寻找 zip 并强行套上 v_latest.zip 的马甲
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          if [ -n "$ZIP_FILE" ] && [ "$ZIP_FILE" != "v_latest.zip" ]; then
+            echo "正在将 $ZIP_FILE 伪装成 v_latest.zip"
+            mv "$ZIP_FILE" v_latest.zip
           fi
+          cd ../..
           
           echo "======================================"
-          echo "弹药装填完毕！验明正身："
+          echo "弹药装填完毕！云端验货："
           ls -lh workspace/package/
           
       - name: 3. 在云端启动黑灯工厂
@@ -60,7 +53,7 @@ jobs:
       - name: 5. 发货到仓库 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v3.0.${{ github.run_number }}
+          tag_name: v4.0.${{ github.run_number }}
           files: wechat-vnc.tar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
