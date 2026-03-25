@@ -1,23 +1,41 @@
-name: Smuggle WeChat-VNC
+name: Build & Smuggle Saroth WeChat
 on: 
-  workflow_dispatch: # 允许手动点击运行
+  workflow_dispatch:
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # 授权自动创建 Release
+      contents: write
     steps:
-      - name: Pull Docker Image
-        run: docker pull linyanyuan/wechat-vnc:latest
-        
-      - name: Save Docker Image to Tarball
-        run: docker save -o wechat-vnc.tar linyanyuan/wechat-vnc:latest
+      - name: 1. 克隆作者的构建图纸
+        uses: actions/checkout@v4
+        with:
+          repository: Saroth/docker_wechat
           
-      - name: Create Release and Upload
+      - name: 2. 下载学姐的“基础组件” (微信与WCF安装包)
+        run: |
+          mkdir -p package
+          # 注意：这里我以 WCF 39.2.4 为例。如果你的 Java SDK 需要特定版本，请修改这里的链接！
+          wget https://github.com/lich0821/WeChatFerry/releases/download/v39.2.4/WeChatFerry-v39.2.4.zip -P package/
+          wget https://github.com/lich0821/WeChatFerry/releases/download/v39.2.4/WeChatSetup-3.9.10.27.exe -P package/
+          
+      - name: 3. 在云端启动工厂，组装肉身！
+        run: |
+          chmod +x ./docker/docker_build.sh
+          sudo ./docker/docker_build.sh
+          
+      - name: 4. 把重塑好的肉身装箱压缩
+        run: |
+          # 自动寻找刚才构建出来的镜像名称并打包
+          IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "wechat|wcf" | head -n 1)
+          echo "正在打包镜像: $IMAGE_NAME"
+          docker save -o wechat-vnc.tar $IMAGE_NAME
+          
+      - name: 5. 发货到仓库 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v1.0.${{ github.run_number }} # 动态版本号，防止多次打包冲突
+          tag_name: v2.0.${{ github.run_number }}
           files: wechat-vnc.tar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
