@@ -1,4 +1,4 @@
-name: Build & Smuggle Saroth WeChat
+name: Build & Smuggle Saroth WeChat (BYOA 自带干粮版)
 on: 
   workflow_dispatch:
 
@@ -8,64 +8,39 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 1. 克隆构建图纸
+      - name: 1. 拉取你自己的私有军火库
         uses: actions/checkout@v4
-        with:
-          repository: Saroth/docker_wechat
-          
-      - name: 2. 启动末日拾荒 (全网搜寻遗失的安装包)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 这一步会把你刚上传的 package 文件夹拉到云端
+        
+      - name: 2. 克隆作者图纸并注入灵魂
         run: |
-          mkdir -p package
-          echo "主基地没货，启动拾荒雷达，扫描最近的 Fork 节点..."
+          echo "下载 Saroth 图纸..."
+          git clone https://github.com/Saroth/docker_wechat.git workspace
           
-          # 抓取最近的 100 个分支仓库名单
-          FORKS=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/lich0821/WeChatFerry/forks?sort=newest&per_page=100" | grep '"full_name":' | cut -d'"' -f4)
+          echo "把咱们自带的弹药库塞进图纸里..."
+          # 强制把你仓库里的 package 文件夹移到构建目录里
+          mv package/ workspace/
           
-          for fork in $FORKS; do
-            echo "正在探测节点: $fork ..."
-            JSON=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$fork/releases")
-            
-            # 寻找成品的 zip 和 exe
-            ZIP_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.zip"' | head -n 1 | cut -d'"' -f4)
-            EXE_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.exe"' | head -n 1 | cut -d'"' -f4)
-            
-            if [ -n "$ZIP_URL" ] && [ -n "$EXE_URL" ]; then
-              echo "🎯 发现宝藏！在 $fork 节点找到了幸存物资！"
-              echo "ZIP: $ZIP_URL"
-              echo "EXE: $EXE_URL"
-              break
-            fi
-          done
+          echo "验明正身！"
+          ls -lh workspace/package/
           
-          if [ -z "$ZIP_URL" ] || [ -z "$EXE_URL" ]; then
-            echo "❌ 完犊子，前 100 个节点全被清空了！"
-            exit 1
-          fi
-          
-          echo "正在火速抢收..."
-          wget -q --show-progress -O package/v_latest.zip "$ZIP_URL"
-          wget -q --show-progress -P package/ "$EXE_URL"
-          
-          echo "===== 验明正身 ====="
-          file package/v_latest.zip
-          ls -lh package/
-          
-      - name: 3. 在云端启动工厂构建
+      - name: 3. 在云端启动黑灯工厂
         run: |
+          cd workspace
           chmod +x ./docker/docker_build.sh
           sudo ./docker/docker_build.sh
           
       - name: 4. 打包重塑的肉身
         run: |
+          # 提取打包出来的镜像名字
           IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "wechat|wcf" | head -n 1)
+          echo "正在打包镜像: $IMAGE_NAME"
           docker save -o wechat-vnc.tar $IMAGE_NAME
           
       - name: 5. 发货到仓库 Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v2.0.${{ github.run_number }}
+          tag_name: v3.0.${{ github.run_number }}
           files: wechat-vnc.tar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
