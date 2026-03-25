@@ -1,0 +1,23 @@
+name: Smuggle WeChat-VNC
+on: 
+  workflow_dispatch: # 允许手动点击运行
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 授权自动创建 Release
+    steps:
+      - name: Pull Docker Image
+        run: docker pull linyanyuan/wechat-vnc:latest
+        
+      - name: Save Docker Image to Tarball
+        run: docker save -o wechat-vnc.tar linyanyuan/wechat-vnc:latest
+          
+      - name: Create Release and Upload
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }} # 动态版本号，防止多次打包冲突
+          files: wechat-vnc.tar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
