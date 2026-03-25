@@ -8,6 +8,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 🚨 终极修复 1：把仓库环境拉取回来，告诉云端我们在哪
+      - name: 0. 载入当前仓库上下文
+        uses: actions/checkout@v4
+
       - name: 1. 克隆作者图纸
         run: |
           echo "下载 Saroth 图纸..."
@@ -20,8 +24,8 @@ jobs:
           echo "启动提货专线，直连你刚建的 ammo 仓库..."
           mkdir -p workspace/package
           
-          # 直接从你自己的 release (标签为 ammo) 下载那两个文件
-          gh release download ammo -D workspace/package/
+          # 🚨 终极修复 2：加上 -R ${{ github.repository }} 强制锁定你的仓库！
+          gh release download ammo -R ${{ github.repository }} -D workspace/package/
           
           echo "提货完成！开始自动适配伪装..."
           cd workspace/package/
