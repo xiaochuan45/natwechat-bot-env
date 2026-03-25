@@ -13,21 +13,25 @@ jobs:
         with:
           repository: Saroth/docker_wechat
           
-      - name: 2. 精准下载学姐的 v39.5.1 稳定版组件
+      - name: 2. 精准下载并伪装学姐的 v39.5.1 组件
         run: |
           mkdir -p package
           echo "开始请求 GitHub API，精准定位 v39.5.1 的真实下载链接..."
           
-          # 利用 API 直接抓取 v39.5.1 标签下的所有文件链接，彻底告别盲猜 404
+          # 利用 API 抓取链接，彻底告别 404
           URLS=$(curl -s https://api.github.com/repos/lich0821/WeChatFerry/releases/tags/v39.5.1 | grep "browser_download_url" | cut -d '"' -f 4)
           
-          # 循环下载匹配到的 zip 和 exe 文件
           for url in $URLS; do
             echo "锁定目标，正在下载: $url"
             wget -q --show-progress -P package/ "$url"
           done
           
-          echo "组件拉取完毕！云端验货："
+          # 🚨 终极修复：把官方的长名字重命名为构建脚本期望的短名字
+          cd package/
+          mv WeChatFerry-*.zip v39.5.1.zip || echo "重命名失败，可能文件已是正确格式"
+          cd ..
+          
+          echo "组件准备完毕！云端验货："
           ls -lh package/
           
       - name: 3. 在云端启动工厂构建
@@ -37,7 +41,9 @@ jobs:
           
       - name: 4. 打包重塑的肉身
         run: |
+          # 提取新构建的镜像名称并打包
           IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "wechat|wcf" | head -n 1)
+          echo "正在打包镜像: $IMAGE_NAME"
           docker save -o wechat-vnc.tar $IMAGE_NAME
           
       - name: 5. 发货到仓库 Release
