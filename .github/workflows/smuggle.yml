@@ -13,17 +13,17 @@ jobs:
         with:
           repository: Saroth/docker_wechat
           
-      - name: 2. 动用官方利器强拉最新组件 (百分百成功)
+      - name: 2. 动用官方利器强拉最新组件 (真正完美版)
         env:
           # 注入官方护身符，彻底破解下载限流
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p package
-          echo "抛弃旧方案，使用 Github 官方 CLI 强拉最新版..."
+          echo "使用 Github 官方 CLI 强拉最新版..."
           
-          # 直接自动拉取最新版本的 zip 和 exe，告别 404 和盲猜版本号
-          gh release download -R lich0821/WeChatFerry --latest -p "*.zip" -D package/
-          gh release download -R lich0821/WeChatFerry --latest -p "*.exe" -D package/
+          # 🚨 拔掉 --latest 毒瘤，默认缺省就是自动拉取最新版！
+          gh release download -R lich0821/WeChatFerry -p "*.zip" -D package/
+          gh release download -R lich0821/WeChatFerry -p "*.exe" -D package/
           
           cd package/
           # 找到拉下来的 zip 文件，强行套上 v 开头的马甲满足 Docker 要求
