@@ -13,29 +13,33 @@ jobs:
         with:
           repository: Saroth/docker_wechat
           
-      - name: 2. 网页爬虫暴力抓取 (无视所有API限制)
+      - name: 2. 官方 API 提取纯净直链 (带验真逻辑)
         run: |
           mkdir -p package
-          echo "抛弃官方API，直接用正则爬虫刮取网页！"
+          echo "请求 GitHub 官方 API 获取全部发布数据..."
           
-          # 直接抓取 Releases 页面的原始 HTML 代码
-          HTML=$(curl -sL https://github.com/lich0821/WeChatFerry/releases)
+          # 获取包含所有版本的 API 响应（无视是否为 latest 标签）
+          JSON=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/lich0821/WeChatFerry/releases)
           
-          # 暴力正则抠出第一个(最新版) zip 和 exe 的真实下载路径
-          ZIP_PATH=$(echo "$HTML" | grep -oE '/lich0821/WeChatFerry/releases/download/[^"]+\.zip' | head -n 1)
-          EXE_PATH=$(echo "$HTML" | grep -oE '/lich0821/WeChatFerry/releases/download/[^"]+\.exe' | head -n 1)
+          # 精准提取第一个真实的 zip 和 exe 直链
+          ZIP_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.zip"' | head -n 1 | cut -d'"' -f4)
+          EXE_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.exe"' | head -n 1 | cut -d'"' -f4)
           
-          echo "锁定 ZIP: https://github.com$ZIP_PATH"
-          echo "锁定 EXE: https://github.com$EXE_PATH"
+          echo "获取到的真实 ZIP 链接: $ZIP_URL"
+          echo "获取到的真实 EXE 链接: $EXE_URL"
           
-          # 直接下载！并在下载时强制把 zip 命名为 Docker 期望的 v_latest.zip
-          wget -q --show-progress -O package/v_latest.zip "https://github.com$ZIP_PATH"
-          wget -q --show-progress -P package/ "https://github.com$EXE_PATH"
+          if [ -z "$ZIP_URL" ] || [ -z "$EXE_URL" ]; then
+            echo "❌ 提取失败，请检查 API 响应！"
+            exit 1
+          fi
           
-          # 🚨 终极防线：撕掉所有的 .dockerignore，防止 Docker 抽风屏蔽 package 文件夹
-          rm -f .dockerignore docker/.dockerignore
+          # 正式下载，ZIP 直接强制命名为 v_latest.zip
+          wget -q --show-progress -O package/v_latest.zip "$ZIP_URL"
+          wget -q --show-progress -P package/ "$EXE_URL"
           
-          echo "【大清点】看到这里的压缩包，这把就稳赢了："
+          # 🚨 终极防线：验证文件类型！防止下到假网页
+          echo "===== 验明正身（如果是 Zip archive 说明稳了） ====="
+          file package/v_latest.zip
           ls -lh package/
           
       - name: 3. 在云端启动工厂构建
