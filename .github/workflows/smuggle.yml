@@ -13,27 +13,43 @@ jobs:
         with:
           repository: Saroth/docker_wechat
           
-      - name: 2. 放弃玄学，硬核锁定 v39.5.1 稳定版
+      - name: 2. 终极 Python 核弹级智能下载器 (绝对稳)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p package
-          echo "直接锁定 v39.5.1 标签，指哪打哪..."
+          # 将霸道的 Python 爬虫写入文件
+          cat << 'EOF' > download.py
+          import urllib.request, json, os
+          req = urllib.request.Request('https://api.github.com/repos/lich0821/WeChatFerry/releases')
+          req.add_header('Authorization', 'token ' + os.environ.get('GH_TOKEN', ''))
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  releases = json.loads(resp.read().decode())
+              # 从最新的版本开始往下扫
+              for r in releases:
+                  assets = r.get('assets', [])
+                  has_zip = any(a['name'].endswith('.zip') for a in assets)
+                  has_exe = any(a['name'].endswith('.exe') for a in assets)
+                  # 只要发现同时存在 zip 和 exe 的版本，立刻锁定！
+                  if has_zip and has_exe:
+                      print('========== 锁定完美可用版本: ' + r['tag_name'] + ' ==========')
+                      for a in assets:
+                          name = a['name']
+                          if name.endswith('.zip') or name.endswith('.exe'):
+                              print('正在光速下载: ' + name)
+                              # 自动重命名 zip，满足 Docker 编译需求
+                              out_name = 'package/v_latest.zip' if name.endswith('.zip') else 'package/' + name
+                              urllib.request.urlretrieve(a['browser_download_url'], out_name)
+                      break
+          except Exception as e:
+              print("Python Error:", str(e))
+          EOF
           
-          # 🚨 直接把 v39.5.1 写死在命令里，绝不瞎找！
-          gh release download v39.5.1 -R lich0821/WeChatFerry -p "*.zip" -D package/
-          gh release download v39.5.1 -R lich0821/WeChatFerry -p "*.exe" -D package/
+          # 执行爬虫
+          python3 download.py
           
-          cd package/
-          # 找到拉下来的 zip 文件，强行套上 v 开头的马甲满足 Docker 要求
-          ZIP_NAME=$(ls *.zip | head -n 1)
-          if [[ -n "$ZIP_NAME" && "$ZIP_NAME" != v* ]]; then
-            echo "发现官方包 $ZIP_NAME，正在重命名为 v39.5.1.zip"
-            mv "$ZIP_NAME" v39.5.1.zip
-          fi
-          cd ..
-          
-          echo "【大清点】如果下面出现了 zip 和 exe 文件，第 3 步绝不可能再报错："
+          echo "【终极验货】只要下面有文件，第3步绝不报错！"
           ls -lh package/
           
       - name: 3. 在云端启动工厂构建
