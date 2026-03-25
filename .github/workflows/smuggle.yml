@@ -8,37 +8,47 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 1. 克隆作者的构建图纸
+      - name: 1. 克隆构建图纸
         uses: actions/checkout@v4
         with:
           repository: Saroth/docker_wechat
           
-      - name: 2. 官方 API 提取纯净直链 (带验真逻辑)
+      - name: 2. 启动末日拾荒 (全网搜寻遗失的安装包)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p package
-          echo "请求 GitHub 官方 API 获取全部发布数据..."
+          echo "主基地没货，启动拾荒雷达，扫描最近的 Fork 节点..."
           
-          # 获取包含所有版本的 API 响应（无视是否为 latest 标签）
-          JSON=$(curl -sL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/lich0821/WeChatFerry/releases)
+          # 抓取最近的 100 个分支仓库名单
+          FORKS=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/lich0821/WeChatFerry/forks?sort=newest&per_page=100" | grep '"full_name":' | cut -d'"' -f4)
           
-          # 精准提取第一个真实的 zip 和 exe 直链
-          ZIP_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.zip"' | head -n 1 | cut -d'"' -f4)
-          EXE_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.exe"' | head -n 1 | cut -d'"' -f4)
-          
-          echo "获取到的真实 ZIP 链接: $ZIP_URL"
-          echo "获取到的真实 EXE 链接: $EXE_URL"
+          for fork in $FORKS; do
+            echo "正在探测节点: $fork ..."
+            JSON=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$fork/releases")
+            
+            # 寻找成品的 zip 和 exe
+            ZIP_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.zip"' | head -n 1 | cut -d'"' -f4)
+            EXE_URL=$(echo "$JSON" | grep -oE '"browser_download_url": "[^"]+\.exe"' | head -n 1 | cut -d'"' -f4)
+            
+            if [ -n "$ZIP_URL" ] && [ -n "$EXE_URL" ]; then
+              echo "🎯 发现宝藏！在 $fork 节点找到了幸存物资！"
+              echo "ZIP: $ZIP_URL"
+              echo "EXE: $EXE_URL"
+              break
+            fi
+          done
           
           if [ -z "$ZIP_URL" ] || [ -z "$EXE_URL" ]; then
-            echo "❌ 提取失败，请检查 API 响应！"
+            echo "❌ 完犊子，前 100 个节点全被清空了！"
             exit 1
           fi
           
-          # 正式下载，ZIP 直接强制命名为 v_latest.zip
+          echo "正在火速抢收..."
           wget -q --show-progress -O package/v_latest.zip "$ZIP_URL"
           wget -q --show-progress -P package/ "$EXE_URL"
           
-          # 🚨 终极防线：验证文件类型！防止下到假网页
-          echo "===== 验明正身（如果是 Zip archive 说明稳了） ====="
+          echo "===== 验明正身 ====="
           file package/v_latest.zip
           ls -lh package/
           
@@ -50,7 +60,6 @@ jobs:
       - name: 4. 打包重塑的肉身
         run: |
           IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "wechat|wcf" | head -n 1)
-          echo "正在打包镜像: $IMAGE_NAME"
           docker save -o wechat-vnc.tar $IMAGE_NAME
           
       - name: 5. 发货到仓库 Release
