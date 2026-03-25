@@ -1,4 +1,4 @@
-name: Build & Smuggle Saroth WeChat (BYOA 自带干粮版)
+name: Build & Smuggle Saroth WeChat (BYOA 自动索敌版)
 on: 
   workflow_dispatch:
 
@@ -8,20 +8,41 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 1. 拉取你自己的私有军火库
+      - name: 1. 拉取你的私有仓库文件
         uses: actions/checkout@v4
-        # 这一步会把你刚上传的 package 文件夹拉到云端
         
-      - name: 2. 克隆作者图纸并注入灵魂
+      - name: 2. 克隆作者图纸 & 全自动巡航索敌
         run: |
           echo "下载 Saroth 图纸..."
           git clone https://github.com/Saroth/docker_wechat.git workspace
           
-          echo "把咱们自带的弹药库塞进图纸里..."
-          # 强制把你仓库里的 package 文件夹移到构建目录里
-          mv package/ workspace/
+          echo "======================================"
+          echo "启动雷达，在你的仓库里搜索弹药..."
+          mkdir -p workspace/package
           
-          echo "验明正身！"
+          # 自动寻找任何一层目录下的 zip 和 exe
+          ZIP_FILE=$(find . -path ./workspace -prune -o -name "*.zip" -print | head -n 1)
+          EXE_FILE=$(find . -path ./workspace -prune -o -name "*.exe" -print | head -n 1)
+          
+          if [ -n "$ZIP_FILE" ]; then
+            echo "🎯 找到注入包: $ZIP_FILE"
+            # 不管你之前改没改名，这里强制给你改成标准名字！
+            mv "$ZIP_FILE" workspace/package/v_latest.zip
+          else
+            echo "❌ 致命错误：整个仓库都没找到 .zip 文件！你确定点 Upload 上传并 Commit 了吗？"
+            exit 1
+          fi
+          
+          if [ -n "$EXE_FILE" ]; then
+            echo "🎯 找到微信安装包: $EXE_FILE"
+            mv "$EXE_FILE" workspace/package/
+          else
+            echo "❌ 致命错误：整个仓库都没找到 .exe 文件！"
+            exit 1
+          fi
+          
+          echo "======================================"
+          echo "弹药装填完毕！验明正身："
           ls -lh workspace/package/
           
       - name: 3. 在云端启动黑灯工厂
@@ -32,7 +53,6 @@ jobs:
           
       - name: 4. 打包重塑的肉身
         run: |
-          # 提取打包出来的镜像名字
           IMAGE_NAME=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "wechat|wcf" | head -n 1)
           echo "正在打包镜像: $IMAGE_NAME"
           docker save -o wechat-vnc.tar $IMAGE_NAME
