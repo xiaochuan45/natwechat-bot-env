@@ -13,43 +13,29 @@ jobs:
         with:
           repository: Saroth/docker_wechat
           
-      - name: 2. 终极 Python 核弹级智能下载器 (绝对稳)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 2. 网页爬虫暴力抓取 (无视所有API限制)
         run: |
           mkdir -p package
-          # 将霸道的 Python 爬虫写入文件
-          cat << 'EOF' > download.py
-          import urllib.request, json, os
-          req = urllib.request.Request('https://api.github.com/repos/lich0821/WeChatFerry/releases')
-          req.add_header('Authorization', 'token ' + os.environ.get('GH_TOKEN', ''))
-          try:
-              with urllib.request.urlopen(req) as resp:
-                  releases = json.loads(resp.read().decode())
-              # 从最新的版本开始往下扫
-              for r in releases:
-                  assets = r.get('assets', [])
-                  has_zip = any(a['name'].endswith('.zip') for a in assets)
-                  has_exe = any(a['name'].endswith('.exe') for a in assets)
-                  # 只要发现同时存在 zip 和 exe 的版本，立刻锁定！
-                  if has_zip and has_exe:
-                      print('========== 锁定完美可用版本: ' + r['tag_name'] + ' ==========')
-                      for a in assets:
-                          name = a['name']
-                          if name.endswith('.zip') or name.endswith('.exe'):
-                              print('正在光速下载: ' + name)
-                              # 自动重命名 zip，满足 Docker 编译需求
-                              out_name = 'package/v_latest.zip' if name.endswith('.zip') else 'package/' + name
-                              urllib.request.urlretrieve(a['browser_download_url'], out_name)
-                      break
-          except Exception as e:
-              print("Python Error:", str(e))
-          EOF
+          echo "抛弃官方API，直接用正则爬虫刮取网页！"
           
-          # 执行爬虫
-          python3 download.py
+          # 直接抓取 Releases 页面的原始 HTML 代码
+          HTML=$(curl -sL https://github.com/lich0821/WeChatFerry/releases)
           
-          echo "【终极验货】只要下面有文件，第3步绝不报错！"
+          # 暴力正则抠出第一个(最新版) zip 和 exe 的真实下载路径
+          ZIP_PATH=$(echo "$HTML" | grep -oE '/lich0821/WeChatFerry/releases/download/[^"]+\.zip' | head -n 1)
+          EXE_PATH=$(echo "$HTML" | grep -oE '/lich0821/WeChatFerry/releases/download/[^"]+\.exe' | head -n 1)
+          
+          echo "锁定 ZIP: https://github.com$ZIP_PATH"
+          echo "锁定 EXE: https://github.com$EXE_PATH"
+          
+          # 直接下载！并在下载时强制把 zip 命名为 Docker 期望的 v_latest.zip
+          wget -q --show-progress -O package/v_latest.zip "https://github.com$ZIP_PATH"
+          wget -q --show-progress -P package/ "https://github.com$EXE_PATH"
+          
+          # 🚨 终极防线：撕掉所有的 .dockerignore，防止 Docker 抽风屏蔽 package 文件夹
+          rm -f .dockerignore docker/.dockerignore
+          
+          echo "【大清点】看到这里的压缩包，这把就稳赢了："
           ls -lh package/
           
       - name: 3. 在云端启动工厂构建
