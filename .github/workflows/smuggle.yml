@@ -1,4 +1,4 @@
-name: Build & Smuggle Saroth WeChat (私有军火库版)
+name: Build & Smuggle Saroth WeChat (稳如老狗版)
 on: 
   workflow_dispatch:
 
@@ -8,7 +8,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      # 🚨 终极修复 1：把仓库环境拉取回来，告诉云端我们在哪
       - name: 0. 载入当前仓库上下文
         uses: actions/checkout@v4
 
@@ -17,21 +16,33 @@ jobs:
           echo "下载 Saroth 图纸..."
           git clone https://github.com/Saroth/docker_wechat.git workspace
           
-      - name: 2. 从你自己的私有军火库提货
+      - name: 2. 智能提取私有弹药库 (无视标签名)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "启动提货专线，直连你刚建的 ammo 仓库..."
+          echo "【雷达诊断】先看看你的仓库里到底有哪些 Release："
+          gh release list -R ${{ github.repository }}
+          
           mkdir -p workspace/package
           
-          # 🚨 终极修复 2：加上 -R ${{ github.repository }} 强制锁定你的仓库！
-          gh release download ammo -R ${{ github.repository }} -D workspace/package/
+          # 自动寻找最新的 Release 标签，不管你起的是啥名字！
+          LATEST_TAG=$(gh release view -R ${{ github.repository }} --json tagName -q .tagName 2>/dev/null || echo "")
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "❌ 致命错误：雷达没扫到任何已发布的 Release！"
+            echo "⚠️ 真相大白：你去你的 GitHub 仓库右侧 Releases 里看看，是不是显示了一个 'Draft' (草稿) 字样？"
+            echo "👉 解决方法：点进那个草稿，拉到最下面，点击绿色的【Publish release】！然后再来跑！"
+            exit 1
+          fi
+          
+          echo "🎯 成功锁定最新弹药库标签: $LATEST_TAG"
+          gh release download "$LATEST_TAG" -R ${{ github.repository }} -D workspace/package/
           
           echo "提货完成！开始自动适配伪装..."
           cd workspace/package/
           
           # 自动寻找 zip 并强行套上 v_latest.zip 的马甲
-          ZIP_FILE=$(ls *.zip | head -n 1)
+          ZIP_FILE=$(ls *.zip 2>/dev/null | head -n 1)
           if [ -n "$ZIP_FILE" ] && [ "$ZIP_FILE" != "v_latest.zip" ]; then
             echo "正在将 $ZIP_FILE 伪装成 v_latest.zip"
             mv "$ZIP_FILE" v_latest.zip
