@@ -16,9 +16,12 @@ jobs:
       - name: 2. 下载学姐的基础组件
         run: |
           mkdir -p package
-          wget https://github.com/lich0821/WeChatFerry/releases/download/v39.2.4/WeChatFerry-v39.2.4.zip -P package/
-          wget https://github.com/lich0821/WeChatFerry/releases/download/v39.2.4/WeChatSetup-3.9.10.27.exe -P package/
+          # ⬇️ 把这里换成 v39.5.2 的 WeChatFerry zip 真实下载链接
+          wget https://github.com/lich0821/WeChatFerry/releases/download/v39.5.2/WeChatFerry-v39.5.2.zip -P package/
           
+          # ⬇️ 把这里换成对应的 WeChatSetup-3.9.x.xx.exe 真实下载链接
+          wget https://github.com/lich0821/WeChatFerry/releases/download/v39.5.2/WeChatSetup-填真实的微信版本号.exe -P package/   
+      
       - name: 3. 在云端启动工厂构建
         run: |
           chmod +x ./docker/docker_build.sh
